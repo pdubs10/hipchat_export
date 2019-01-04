@@ -164,6 +164,9 @@ def message_export(user_token, user_id, user_name):
 
     # flag to control pagination
     MORE_RECORDS = True
+    START_INDEX = 0
+    MAX_RESULTS = 1000
+    START_TIME = int(time())
 
     # flag to track iteration through pages
     LEVEL = 0
@@ -176,7 +179,7 @@ def message_export(user_token, user_id, user_name):
 
     # Set initial URL with correct user_id
     global HIPCHAT_API_URL
-    url = HIPCHAT_API_URL + "/user/%s/history?date=%s&reverse=false&max-results=1000" % (user_id, int(time()))
+    url = HIPCHAT_API_URL + "/user/%s/history?date=%s&reverse=false&max-results=%s&start-index=%s" % (user_id, START_TIME, MAX_RESULTS, START_INDEX)
 
     # main loop to fetch and save messages
     while MORE_RECORDS:
@@ -239,11 +242,13 @@ def message_export(user_token, user_id, user_name):
                     check_requests_vs_limit()
 
         # check for more records to process
-        if 'next' in r.json()['links']:
-            url = r.json()['links']['next']
+        if len(r.json()["items"]) == MAX_RESULTS:
+            START_INDEX = START_INDEX + MAX_RESULTS
+            url = HIPCHAT_API_URL + "/user/%s/history?date=%s&reverse=false&max-results=%s&start-index=%s" % (user_id, START_TIME, MAX_RESULTS, START_INDEX)
             LEVEL += 1
         else:
             MORE_RECORDS = False
+            START_INDEX = 0
 
             # end loop
 
