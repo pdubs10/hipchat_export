@@ -74,7 +74,7 @@ FILE_DIR = os.path.join(EXPORT_DIR, 'uploads')
 HIPCHAT_API_URL = "http://api.hipchat.com/v2"
 REQUESTS_RATE_LIMIT = 100
 TOTAL_REQUESTS = 0
-
+COMPLETED_FILE = os.path.join(EXPORT_DIR, 'completed.txt')
 
 def log(msg):
     if msg[0] == "\n":
@@ -151,6 +151,12 @@ def display_userlist(user_list):
 
 
 def message_export(user_token, user_id, user_name):
+
+    # Return if user has already been exported
+    if os.path.isfile(COMPLETED_FILE) and user_id in io.open(COMPLETED_FILE).read():
+        log("  User already exported")
+        return
+
     # Set HTTP header to use user token for auth
     headers = {'Authorization': 'Bearer ' + user_token}
 
@@ -206,6 +212,8 @@ def message_export(user_token, user_id, user_name):
 
         if len(r.json().get('items')) == 0:
             log("  No items for user %s, skipping" % user_name)
+            with io.open(COMPLETED_FILE, 'a', encoding='utf-8') as f:
+                f.write("%s %s - 0 messages\n" % (user_id, user_name))
             return
 
         # create dirs for current user
@@ -260,6 +268,8 @@ def message_export(user_token, user_id, user_name):
 
             # end loop
 
+    with io.open(COMPLETED_FILE, 'a', encoding='utf-8') as f:
+        f.write("%s %s\n" % (user_id, user_name))
 
 class Usage(Exception):
     def __init__(self, msg):
