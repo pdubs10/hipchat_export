@@ -81,7 +81,7 @@ def log(msg):
         msg = msg[1:]
         log(' ')
     logit = '[%s] %s' % (datetime.now(), msg)
-    print(logit.encode('utf8'))
+    print(logit)
 
 
 def vlog(msg):
@@ -154,14 +154,6 @@ def message_export(user_token, user_id, user_name):
     # Set HTTP header to use user token for auth
     headers = {'Authorization': 'Bearer ' + user_token}
 
-    # create dirs for current user
-    dir_name = os.path.join(EXPORT_DIR, user_name)
-    if not os.path.isdir(dir_name):
-        os.makedirs(dir_name)
-    dir_name = os.path.join(FILE_DIR, user_id)
-    if not os.path.isdir(dir_name):
-        os.makedirs(dir_name)
-
     # flag to control pagination
     MORE_RECORDS = True
 
@@ -204,6 +196,18 @@ def message_export(user_token, user_id, user_name):
         # check JSON for objects and react
         if 'items' not in r.json():
             raise Usage("Could not find messages in API return data... Check your token and try again.")
+
+        if len(r.json().get('items')) == 0:
+            log("  No items for user %s, skipping" % user_name)
+            return
+
+        # create dirs for current user
+        dir_name = os.path.join(EXPORT_DIR, user_name)
+        if not os.path.isdir(dir_name):
+            os.makedirs(dir_name)
+        dir_name = os.path.join(FILE_DIR, user_id)
+        if not os.path.isdir(dir_name):
+            os.makedirs(dir_name)
 
         # write the current JSON dump to file
         file_name = os.path.join(EXPORT_DIR, user_name, str(LEVEL) + '.txt')
@@ -334,13 +338,15 @@ def main(argv=None):
         else:
             extract = USER_LIST.items()
 
+        total_users = len(extract)
+        current_user = 1
         for user_id, user_name in extract:
-            log("\nExporting 1-to-1 messages for %s (ID: %s)..." % (user_name, user_id))
+            log("\n[%s/%s] Exporting 1-to-1 messages for %s (ID: %s)..." % (current_user, total_users, user_name, user_id))
             try:
                 message_export(USER_TOKEN, user_id, user_name)
             except ApiError as e:
                 print("Hipchat API returned HTTP {code}/{type}: {message}".format(**e.message))
-                return
+            current_user += 1
 
     except Usage as err:
         print("%s: %s" % (sys.argv[0].split("/")[-1], str(err.msg)), file=sys.stderr)
