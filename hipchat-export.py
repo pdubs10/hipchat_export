@@ -164,8 +164,12 @@ def message_export(user_token, user_id, user_name):
 
     # flag to control pagination
     MORE_RECORDS = True
+
+    # pagination variables
     START_INDEX = 0
     MAX_RESULTS = 1000
+
+    # start time
     START_TIME = int(time())
 
     # flag to track iteration through pages
@@ -340,12 +344,12 @@ def main(argv=None):
             extract = USER_LIST.items()
 
         for user_id, user_name in extract:
-            log("\nExporting 1-to-1 messages for %s (ID: %s)..." % (user_name, user_id))
-            try:
-                message_export(USER_TOKEN, user_id, user_name)
-            except ApiError as e:
-                print("Hipchat API returned HTTP {code}/{type}: {message}".format(**e.message))
-                return
+            for user_id, user_name in extract:
+                log("\nExporting 1-to-1 messages for %s (ID: %s)..." % (user_name, user_id))
+                try:
+                    message_export(USER_TOKEN, user_id, user_name)
+                except ApiError as e:
+                    print("Hipchat API returned HTTP {code}/{type}: {message}".format(**e.message))
 
     except Usage as err:
         print("%s: %s" % (sys.argv[0].split("/")[-1], str(err.msg)), file=sys.stderr)
