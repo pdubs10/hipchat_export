@@ -74,14 +74,14 @@ FILE_DIR = os.path.join(EXPORT_DIR, 'uploads')
 HIPCHAT_API_URL = "http://api.hipchat.com/v2"
 REQUESTS_RATE_LIMIT = 100
 TOTAL_REQUESTS = 0
-
+COMPLETED_FILE = os.path.join(EXPORT_DIR, 'completed.txt')
 
 def log(msg):
     if msg[0] == "\n":
         msg = msg[1:]
         log(' ')
     logit = '[%s] %s' % (datetime.now(), msg)
-    print(logit.encode('utf8'))
+    print(logit)
 
 
 def vlog(msg):
@@ -151,16 +151,14 @@ def display_userlist(user_list):
 
 
 def message_export(user_token, user_id, user_name):
+
+    # Return if user has already been exported
+    if os.path.isfile(COMPLETED_FILE) and user_id in io.open(COMPLETED_FILE).read():
+        log("  User already exported")
+        return
+
     # Set HTTP header to use user token for auth
     headers = {'Authorization': 'Bearer ' + user_token}
-
-    # create dirs for current user
-    dir_name = os.path.join(EXPORT_DIR, user_name)
-    if not os.path.isdir(dir_name):
-        os.makedirs(dir_name)
-    dir_name = os.path.join(FILE_DIR, user_id)
-    if not os.path.isdir(dir_name):
-        os.makedirs(dir_name)
 
     # flag to control pagination
     MORE_RECORDS = True
@@ -212,6 +210,20 @@ def message_export(user_token, user_id, user_name):
         if 'items' not in r.json():
             raise Usage("Could not find messages in API return data... Check your token and try again.")
 
+        if len(r.json().get('items')) == 0:
+            log("  No items for user %s, skipping" % user_name)
+            with io.open(COMPLETED_FILE, 'a', encoding='utf-8') as f:
+                f.write("%s %s - 0 messages\n" % (user_id, user_name))
+            return
+
+        # create dirs for current user
+        dir_name = os.path.join(EXPORT_DIR, user_name)
+        if not os.path.isdir(dir_name):
+            os.makedirs(dir_name)
+        dir_name = os.path.join(FILE_DIR, user_id)
+        if not os.path.isdir(dir_name):
+            os.makedirs(dir_name)
+
         # write the current JSON dump to file
         file_name = os.path.join(EXPORT_DIR, user_name, str(LEVEL) + '.txt')
         vlog("  + writing JSON to disk: %s" % (file_name))
@@ -256,6 +268,8 @@ def message_export(user_token, user_id, user_name):
 
             # end loop
 
+    with io.open(COMPLETED_FILE, 'a', encoding='utf-8') as f:
+        f.write("%s %s\n" % (user_id, user_name))
 
 class Usage(Exception):
     def __init__(self, msg):
@@ -343,13 +357,15 @@ def main(argv=None):
         else:
             extract = USER_LIST.items()
 
+        total_users = len(extract)
+        current_user = 1
         for user_id, user_name in extract:
-            for user_id, user_name in extract:
-                log("\nExporting 1-to-1 messages for %s (ID: %s)..." % (user_name, user_id))
-                try:
-                    message_export(USER_TOKEN, user_id, user_name)
-                except ApiError as e:
-                    print("Hipchat API returned HTTP {code}/{type}: {message}".format(**e.message))
+            log("\n[%s/%s] Exporting 1-to-1 messages for %s (ID: %s)..." % (current_user, total_users, user_name, user_id))
+            try:
+                message_export(USER_TOKEN, user_id, user_name)
+            except ApiError as e:
+                print("Hipchat API returned HTTP {code}/{type}: {message}".format(**e.message))
+            current_user += 1
 
     except Usage as err:
         print("%s: %s" % (sys.argv[0].split("/")[-1], str(err.msg)), file=sys.stderr)
